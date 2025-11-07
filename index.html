@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Installation — web copy</title>
 
-  <!-- мгновенная favicon, чтобы не было 404 -->
+  <!-- простая favicon, чтобы не ловить 404 -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23000'/%3E%3Ccircle cx='32' cy='32' r='18' fill='%23fff'/%3E%3C/svg%3E">
 
   <style>
@@ -13,7 +13,6 @@
       --bg:#000; --fg:#fff; --muted:#b5b5b5;
       --tile:#000; --tile-active:#3d3d3d;
       --ctrl:#111; --ctrl-hover:#1a1a1a;
-      --accent:#0af; --danger:#ff6b6b;
       --gap:12px; --pad:16px; --radius:12px;
     }
     *{ box-sizing:border-box; }
@@ -32,17 +31,29 @@
       max-width:960px; margin:0 auto; padding:10px var(--pad);
     }
     .brand{ font-weight:700; }
+
     .status-badge{
       font-size:13px; color:#000; background:#fff; border-radius:999px;
       padding:6px 10px; min-width:120px; text-align:center;
+      box-shadow: 0 0 0 rgba(255,255,255,0);
+      transition: background-color .2s ease, color .2s ease, box-shadow .2s ease;
     }
-    .status-badge.loading{ background:#ffd64d; }
+    .status-badge.loading{
+      background:#ffd64d;
+      /* мягкая световая пульсация */
+      animation: pulseGlow 1.6s ease-in-out infinite;
+    }
     .status-badge.ready{ background:#9cff7a; }
     .status-badge.busy{ background:#7abaff; }
     .status-badge.error{ background:#ff9c9c; }
 
-    .wrap{ max-width:960px; margin:0 auto; padding:var(--pad); }
+    @keyframes pulseGlow{
+      0%   { box-shadow: 0 0 0 rgba(255,214,77,0); }
+      50%  { box-shadow: 0 0 22px rgba(255,214,77,.8); }
+      100% { box-shadow: 0 0 0 rgba(255,214,77,0); }
+    }
 
+    .wrap{ max-width:960px; margin:0 auto; padding:var(--pad); }
     .hint{ color:var(--muted); font-size:14px; }
 
     /* ГРУППЫ: Низы / Середины / Верхи */
@@ -84,7 +95,7 @@
     .ctrl:hover{ background:var(--ctrl-hover); }
     .ctrl:active{ transform:scale(.98); }
 
-    .err{ color:var(--danger); font-size:14px; margin-top:10px; white-space:pre-wrap; }
+    .err{ color:#ff6b6b; font-size:14px; margin-top:10px; white-space:pre-wrap; }
 
     /* Оверлей разблокировки звука */
     .overlay{
@@ -110,7 +121,7 @@
   <header>
     <div class="bar">
       <div class="brand">Веб-копия инсталляции</div>
-      <div class="status-badge loading" id="status">Загружаю…</div>
+      <div class="status-badge loading" id="status">Ожидание…</div>
     </div>
   </header>
 
@@ -167,8 +178,6 @@
 
 <script>
 (()=>{
-
-  // ===== helpers =====
   const E  = (sel, root=document) => root.querySelector(sel);
   const EA = (sel, root=document) => Array.from(root.querySelectorAll(sel));
   const status = E('#status');
@@ -183,27 +192,29 @@
   ];
   const satellites = { low:'sounds/down.mp3', mid:'sounds/middle.mp3', high:'sounds/up.mp3' };
   const prelude = 'sounds/all.mp3';
+
   const groupOf = i => (i<=2?'low': i<=5?'mid':'high');
   const groups = ['low','mid','high'];
   const MAX_ACTIVE = 3;
-  const SATELLITE_DELAY_MS = 4000;    // как на «железе»: через 4 сек при тройке
-  const FADE_MS = 1200;               // плавнее
+  const SATELLITE_DELAY_MS = 4000; // 4 секунды, как на железе
+  const FADE_MS = 1200;            // плавные фейды
   const SAT_FADE_MS = 1200;
 
   let ctx, master;
-  let gains = [];             // по 9, громкости лупов
-  let buffers = [];           // по 9
-  let loopNodes = [];         // BufferSource по 9 (всегда крутятся)
-  let active = new Set();     // индексы включённых плиток
-  let lru = [];               // порядок активаций (LRU)
+  let gains = [];          // 9 GainNode для основных лупов
+  let buffers = [];        // 9 AudioBuffer
+  let loopNodes = [];      // 9 BufferSource (всегда играют в фоне)
+
+  // состояние плиток
+  let active = new Set();
+  let lru = [];
   let groupQueues = {low:[], mid:[], high:[]};
 
   // сателлиты
-  let satBuffers = {};        // per group
-  let satGains   = {};        // per group GainNode
-  let satNodes   = {};        // per group BufferSource (loop)
-  let satTarget  = {low:0, mid:0, high:0};   // цель громкости
-  let satLast3At = {low:0, mid:0, high:0};   // когда стало 3 активных в группе
+  let satBuffers = {};
+  let satGains   = {};
+  let satNodes   = {};
+  let satLast3At = {low:0, mid:0, high:0};
 
   // вдох
   let preludeBuf = null;
@@ -217,30 +228,31 @@
   function showErr(msg){
     errBox.hidden = false;
     errBox.textContent = msg;
-    setStatus('Ошибка', 'error');
+    setStatus('Ошибка','error');
     console.error(msg);
   }
 
-  // ===== Audio init on user gesture =====
+  // ===== инициализация аудио по жесту =====
   btnUnlock.addEventListener('click', async ()=>{
     try{
       if (!ctx){
         ctx = new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'});
         master = ctx.createGain(); master.gain.value = 0.95; master.connect(ctx.destination);
 
-        // основные gain-каналы
         for (let i=0;i<9;i++){
           const g = ctx.createGain(); g.gain.value = 0.0; g.connect(master); gains[i] = g;
         }
-        // сателлиты gain-каналы
         for (const k of groups){
           const g = ctx.createGain(); g.gain.value = 0.0; g.connect(master); satGains[k] = g;
         }
 
-        setStatus('Загружаю звуки…','loading');
+        setStatus('Загружаю…','loading');
         await loadAllAudio();
-        startAllLoops(); // сразу запускаем 9 лупов «в фоне»
+        startAllLoops(); // 9 лупов крутятся тихо
         setStatus('Готово. Нажимайте кнопки.','ready');
+
+        // периодический тик, чтобы сателлиты включались даже без новых кликов
+        setInterval(checkSatellites, 200);
       }
       await ctx.resume();
       gate.remove();
@@ -259,13 +271,10 @@
   }
   async function loadAllAudio(){
     try{
-      // основные (00..08)
       buffers = await Promise.all(files.map(decode));
-      // сателлиты
       for (const [k, url] of Object.entries(satellites)){
         satBuffers[k] = await decode(url);
       }
-      // прелюдия
       preludeBuf = await decode(prelude);
     }catch(e){
       showErr('Ошибка загрузки аудио. Проверьте пути/имена файлов.\n'+e.message);
@@ -274,7 +283,6 @@
   }
 
   function startAllLoops(){
-    // 9 постоянных источников
     for (let i=0;i<9;i++){
       const src = ctx.createBufferSource();
       src.buffer = buffers[i];
@@ -285,7 +293,6 @@
     }
   }
 
-  // сателлит — создать и запустить, если ещё не
   function ensureSatRunning(g){
     if (satNodes[g]) return;
     const src = ctx.createBufferSource();
@@ -296,7 +303,6 @@
     satNodes[g] = src;
   }
 
-  // плавные фейды
   function fadeTo(param, to, ms=FADE_MS){
     const now = ctx.currentTime;
     param.cancelScheduledValues(now);
@@ -304,7 +310,6 @@
     param.linearRampToValueAtTime(to, now + ms/1000);
   }
 
-  // LRU и групповые очереди
   function pushLRU(idx){
     lru = lru.filter(i=>i!==idx);
     lru.push(idx);
@@ -357,7 +362,6 @@
     if (groups.every(g=>c[g]>0) && c[gNew]>0){ popOldestFromGroup(gNew); return; }
   }
 
-  // ===== UI actions =====
   function togglePad(idx, el){
     if (!ctx || ctx.state!=='running') return;
     if (preludePlaying && Date.now()<preludeSoftLockUntil) return;
@@ -370,7 +374,7 @@
       fadeTo(gains[idx].gain, 1.0, FADE_MS);
       el.classList.add('active');
     }
-    checkSatellites(); // обновить логику сателлитов на каждое действие
+    checkSatellites();
   }
 
   function random3(){
@@ -387,36 +391,37 @@
 
   function resetAll(){
     [...active].forEach(deactivate);
-    satTarget = {low:0,mid:0,high:0};
-    for (const g of groups) fadeTo(satGains[g].gain, 0.0, SAT_FADE_MS);
+    // гасим сателлиты
+    for (const g of groups){
+      fadeTo(satGains[g].gain, 0.0, SAT_FADE_MS);
+      satLast3At[g] = 0;
+    }
   }
 
-  // ===== satellites logic =====
+  // ===== сателлиты =====
   function checkSatellites(){
     const now = performance.now();
     for (const g of groups){
       const n = activeInGroup(g).length;
       if (n >= 3){
-        if (satLast3At[g]===0) satLast3At[g] = now;
+        if (satLast3At[g] === 0) satLast3At[g] = now;
         if (now - satLast3At[g] >= SATELLITE_DELAY_MS){
           ensureSatRunning(g);
-          satTarget[g] = 0.8;
-          fadeTo(satGains[g].gain, satTarget[g], SAT_FADE_MS);
+          fadeTo(satGains[g].gain, 0.8, SAT_FADE_MS);
         }
       } else {
         satLast3At[g] = 0;
-        satTarget[g] = 0.0;
         fadeTo(satGains[g].gain, 0.0, SAT_FADE_MS);
       }
     }
   }
 
-  // ===== inhale (all) =====
+  // ===== вдох (all) =====
   async function inhale(){
     if (!ctx || ctx.state!=='running') return;
     if (preludePlaying) return;
     preludePlaying = true;
-    preludeSoftLockUntil = Date.now() + 10000; // первые 10 секунд — «жёсткая» блокировка
+    preludeSoftLockUntil = Date.now() + 10000;
 
     setStatus('Вдох…','busy');
     resetAll();
@@ -427,7 +432,6 @@
     const g = ctx.createGain(); g.gain.value = 0.0;
     src.connect(g); g.connect(master); src.start(0);
 
-    // мягкий вход/выход
     const t0 = ctx.currentTime;
     g.gain.setValueAtTime(0, t0);
     g.gain.linearRampToValueAtTime(1.0, t0 + 0.08);
@@ -441,15 +445,14 @@
     };
   }
 
-  // ===== wire UI =====
+  // wire UI
   EA('.pad').forEach(el=> el.addEventListener('click', ()=>togglePad(+el.dataset.idx, el)));
   E('#btn-random').addEventListener('click', random3);
   E('#btn-reset').addEventListener('click', resetAll);
   E('#btn-inhale').addEventListener('click', inhale);
 
-  // первоначальный статус
-  setStatus('Ожидание разрешения звука','loading');
-
+  // начальный статус
+  setStatus('Ожидание…','loading');
 })();
 </script>
 </body>
