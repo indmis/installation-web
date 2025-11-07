@@ -5,45 +5,90 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Installation — web copy</title>
   <style>
-    :root {
-      --line:#111; --bg:#fff; --fg:#111;
-      --gap:12px; --pad:16px;
+    :root{
+      --bg:#000;        /* фон */
+      --fg:#fff;        /* текст */
+      --muted:#aaa;     /* подсказки */
+      --card:#000;      /* фон плиток (по умолчанию чёрный) */
+      --card-active:#444; /* активная плитка становится серой */
+      --ctrl:#111;      /* фон кнопок управления */
+      --ctrl-hover:#1a1a1a;
+      --gap:12px; --pad:16px; --radius:10px;
     }
-    * { box-sizing: border-box; }
-    html,body { margin:0; padding:0; background:var(--bg); color:var(--fg); font:16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
-    header { position:sticky; top:0; background:#fff; border-bottom:1px solid #ddd; padding:10px var(--pad); z-index:2; }
-    header .row { display:flex; gap:12px; align-items:center; justify-content:space-between; max-width:960px; margin:0 auto; }
-    .hint { opacity:.7; font-size:14px; }
-    .wrap { max-width:960px; margin:0 auto; padding:var(--pad); }
-    .grid {
+    *{ box-sizing:border-box; }
+    html,body{ margin:0; padding:0; background:var(--bg); color:var(--fg);
+      font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    }
+
+    header{
+      position:sticky; top:0; z-index:2;
+      background:rgba(0,0,0,.85); backdrop-filter:saturate(140%) blur(6px);
+      border-bottom:1px solid #111;
+      padding:10px var(--pad);
+    }
+    header .row{
+      display:flex; gap:12px; align-items:center; justify-content:space-between;
+      max-width:960px; margin:0 auto;
+    }
+    .hint{ color:var(--muted); font-size:14px; }
+
+    .wrap{ max-width:960px; margin:0 auto; padding:var(--pad); }
+
+    .grid{
       display:grid; gap:var(--gap);
-      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+      grid-template-columns:repeat(auto-fit,minmax(110px,1fr));
     }
-    .pad, .ctrl {
-      border:2px solid var(--line); background:#fff; cursor:pointer; user-select:none;
+
+    /* кнопки-плитки: без обводки, цифра по центру */
+    .pad, .ctrl{
+      background:var(--card); color:var(--fg);
+      cursor:pointer; user-select:none;
       display:grid; place-items:center; text-align:center;
-      transition: transform .06s ease, opacity .2s ease;
+      border:none; border-radius:var(--radius);
+      transition: transform .06s ease, opacity .2s ease, background-color .15s ease;
     }
-    .pad { aspect-ratio:1/1; }
-    .pad.active { transform:scale(0.98); }
-    .ctrl { padding:12px; }
-    .row2 { display:grid; gap:var(--gap); grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); margin-top:var(--gap); }
-    .err { color:#b00020; font-size:14px; margin-top:8px; white-space:pre-wrap; }
-    .overlay {
-      position:fixed; inset:0; background:#fff; display:flex; align-items:center; justify-content:center;
-      z-index:10; border:3px dashed #111; padding:24px; text-align:center;
+    .pad{ aspect-ratio:1/1; font-weight:600; font-size:22px; }
+    .pad:active{ transform:scale(.98); }
+    .pad.active{ background:var(--card-active); }
+
+    .ctrl{
+      padding:12px 14px; background:var(--ctrl); font-weight:600;
     }
-    .overlay button {
-      border:2px solid #111; background:#fff; padding:12px 18px; font-weight:700; cursor:pointer;
+    .ctrl:hover{ background:var(--ctrl-hover); }
+    .ctrl:active{ transform:scale(.98); }
+
+    .row2{
+      display:grid; gap:var(--gap);
+      grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+      margin-top:var(--gap);
     }
-    .status { font-size:13px; opacity:.7; margin-top:6px; }
+
+    .err{ color:#ff6b6b; font-size:14px; margin-top:8px; white-space:pre-wrap; }
+    .status{ font-size:13px; color:var(--muted); margin-top:6px; }
+
+    .overlay{
+      position:fixed; inset:0; z-index:10;
+      background:#000; color:var(--fg);
+      display:flex; align-items:center; justify-content:center;
+      padding:24px; text-align:center;
+      border:3px dashed #222;
+    }
+    .overlay button{
+      border:none; background:#fff; color:#000; padding:12px 18px;
+      font-weight:700; cursor:pointer; border-radius:12px;
+    }
+    .overlay .hint{ color:#bbb; }
+    /* фокус-обводка для доступности */
+    .pad:focus-visible, .ctrl:focus-visible, .overlay button:focus-visible{
+      outline:2px solid #888; outline-offset:2px;
+    }
   </style>
 </head>
 <body>
   <header>
     <div class="row">
       <div><strong>Веб-копия инсталляции</strong></div>
-      <div class="hint">нажмите «Включить звук», затем кнопки</div>
+      <div class="hint">сначала «Включить звук», затем кнопки</div>
     </div>
   </header>
 
@@ -76,19 +121,19 @@
     <div>
       <p style="margin-top:0">Браузеры блокируют звук до жеста пользователя.</p>
       <button id="unlock">Включить звук</button>
-      <div class="hint" style="margin-top:8px">если вы на iPhone — снимите беззвучный режим</div>
+      <div class="hint" style="margin-top:8px">на iPhone снимите беззвучный режим</div>
     </div>
   </div>
 
 <script>
 (() => {
-  const E = (sel, root=document) => root.querySelector(sel);
+  const E  = (sel, root=document) => root.querySelector(sel);
   const EA = (sel, root=document) => Array.from(root.querySelectorAll(sel));
 
-  const errBox = E('#error');
-  const statusBox = E('#status');
-  const gate = E('#gate');
-  const btnUnlock = E('#unlock');
+  const errBox   = E('#error');
+  const statusBox= E('#status');
+  const gate     = E('#gate');
+  const btnUnlock= E('#unlock');
 
   // файлы
   const files = [
@@ -96,247 +141,126 @@
     'sounds/03.mp3','sounds/04.mp3','sounds/05.mp3',
     'sounds/06.mp3','sounds/07.mp3','sounds/08.mp3'
   ];
-  const satellites = { low:'sounds/down.mp3', mid:'sounds/middle.mp3', high:'sounds/up.mp3' };
   const prelude = 'sounds/all.mp3';
-
-  // группы высот
-  const groupOf = idx => (idx<=2?'low': idx<=5?'mid':'high');
+  const groupOf = i => (i<=2?'low': i<=5?'mid':'high');
   const groups = ['low','mid','high'];
   const MAX_ACTIVE = 3;
 
-  let ctx, master, gains=[], buffers=[], satGains={}, satBuffers={}, preludeBuf=null;
-  let active = new Set();                  // активные индексы 0..8
-  let lru = [];                            // порядок активаций (LRU)
-  let groupQueues = {low:[], mid:[], high:[]};
-  let playingSources = {};                 // idx -> current Source
+  let ctx, master, gains=[], buffers=[], preludeBuf=null;
+  let active = new Set(), lru = [], groupQueues = {low:[],mid:[],high:[]};
+  let playingSources = {};
   let preludePlaying = false;
-  let preludeSoftLockUntil = 0;            // 10 сек «жёсткой блокировки»
+  let preludeSoftLockUntil = 0;
 
   function setStatus(t){ statusBox.textContent = t; }
-  function showErr(msg){
-    errBox.hidden = false;
-    errBox.textContent = msg;
-    console.error(msg);
-  }
+  function showErr(msg){ errBox.hidden=false; errBox.textContent=msg; console.error(msg); }
 
-  // Инициализация аудио после первого жеста
   btnUnlock.addEventListener('click', async () => {
-    try {
-      if (!ctx) {
+    try{
+      if (!ctx){
         ctx = new (window.AudioContext || window.webkitAudioContext)({latencyHint:'interactive'});
         master = ctx.createGain(); master.gain.value = 0.95; master.connect(ctx.destination);
-
-        // Подготовка основных каналов
-        for (let i=0; i<files.length; i++){
-          const g = ctx.createGain(); g.gain.value = 0.0; g.connect(master);
-          gains[i] = g;
-        }
-
-        // Сателлиты
-        for (const k of groups){
-          const g = ctx.createGain(); g.gain.value = 0.0; g.connect(master);
-          satGains[k] = g;
-        }
-
+        for (let i=0;i<files.length;i++){ const g=ctx.createGain(); g.gain.value=0.0; g.connect(master); gains[i]=g; }
         setStatus('Загружаю звуки…');
         await loadAllAudio();
         setStatus('Готово. Нажимайте кнопки.');
       }
       await ctx.resume();
       gate.remove();
-    } catch(e){
-      showErr('Не удалось инициализировать звук: ' + e.message);
-    }
+    }catch(e){ showErr('Не удалось инициализировать звук: '+e.message); }
   });
 
-  async function fetchAsArrayBuffer(url){
-    const r = await fetch(url, {cache:'no-cache'});
-    if (!r.ok) throw new Error(url+' → '+r.status+' '+r.statusText);
-    return await r.arrayBuffer();
-  }
-  async function decode(url){
-    const ab = await fetchAsArrayBuffer(url);
-    return await ctx.decodeAudioData(ab);
-  }
+  async function fetchBuf(url){ const r=await fetch(url,{cache:'no-cache'}); if(!r.ok) throw new Error(url+' → '+r.status); return await r.arrayBuffer(); }
+  async function decode(url){ return await ctx.decodeAudioData(await fetchBuf(url)); }
   async function loadAllAudio(){
-    try {
-      // основные
+    try{
       buffers = await Promise.all(files.map(decode));
-      // сателлиты
-      for (const [k, url] of Object.entries(satellites)){
-        satBuffers[k] = await decode(url);
-      }
-      // прелюдия
       preludeBuf = await decode(prelude);
-    } catch(e){
-      showErr('Ошибка загрузки аудио. Проверьте пути и имена файлов.\n' + e.message);
-      throw e;
-    }
+    }catch(e){ showErr('Ошибка загрузки аудио. Проверьте пути и имена файлов.\n'+e.message); throw e; }
   }
 
-  // Воспроизведение лупов: создаём Source каждый запуск
   function playLoop(idx){
-    stopIdx(idx); // гарантированно один источник на индекс
-    const src = ctx.createBufferSource();
-    src.buffer = buffers[idx];
-    src.loop = true;
-    src.connect(gains[idx]);
-    src.start(0);
-    playingSources[idx] = src;
+    stopIdx(idx);
+    const src=ctx.createBufferSource();
+    src.buffer=buffers[idx]; src.loop=true; src.connect(gains[idx]); src.start(0);
+    playingSources[idx]=src;
   }
-  function stopIdx(idx){
-    const s = playingSources[idx];
-    if (s){ try { s.stop(); } catch{} delete playingSources[idx]; }
-  }
+  function stopIdx(idx){ const s=playingSources[idx]; if(s){ try{s.stop()}catch{} delete playingSources[idx]; } }
 
-  // Плавные фейды
-  function fadeToGain(param, to, ms=600){
-    const now = ctx.currentTime;
-    param.cancelScheduledValues(now);
-    const cur = param.value;
-    param.setValueAtTime(cur, now);
-    param.linearRampToValueAtTime(to, now + ms/1000);
-  }
+  function fadeTo(param,to,ms=600){ const now=ctx.currentTime; param.cancelScheduledValues(now); param.setValueAtTime(param.value,now); param.linearRampToValueAtTime(to, now+ms/1000); }
 
   function pushLRU(idx){
-    lru = lru.filter(i=>i!==idx);
-    lru.push(idx);
-    const g = groupOf(idx);
-    groupQueues[g] = groupQueues[g].filter(i=>i!==idx);
-    groupQueues[g].push(idx);
+    lru = lru.filter(i=>i!==idx); lru.push(idx);
+    const g=groupOf(idx); groupQueues[g]=groupQueues[g].filter(i=>i!==idx); groupQueues[g].push(idx);
   }
-  function popOldestGlobal(){
-    if (!lru.length) return null;
-    const victim = lru.shift();
-    deactivate(victim);
-    return victim;
-  }
-  function popOldestFromGroup(g){
-    if (!groupQueues[g].length) return null;
-    const victim = groupQueues[g].shift();
-    deactivate(victim);
-    return victim;
-  }
+  function popOldestGlobal(){ if(!lru.length) return; const v=lru.shift(); deactivate(v); }
+  function popOldestFromGroup(g){ if(!groupQueues[g].length) return; const v=groupQueues[g].shift(); deactivate(v); }
 
   function deactivate(idx){
     if (!active.has(idx)) return;
     active.delete(idx);
     lru = lru.filter(i=>i!==idx);
-    const g = groupOf(idx);
-    groupQueues[g] = groupQueues[g].filter(i=>i!==idx);
-    fadeToGain(gains[idx].gain, 0.0, 600);
-    // можно не останавливать луп сразу — он «живет» тихо
+    const g=groupOf(idx); groupQueues[g]=groupQueues[g].filter(i=>i!==idx);
+    fadeTo(gains[idx].gain, 0.0, 600);
+    E(`.pad[data-idx="${idx}"]`)?.classList.remove('active');
   }
-
-  function activeInGroup(g){
-    return [...active].filter(i => groupOf(i)===g);
-  }
+  function activeInGroup(g){ return [...active].filter(i=>groupOf(i)===g); }
 
   function balanceBeforeOn(idx){
-    const gNew = groupOf(idx);
-    const counts = {low:activeInGroup('low').length, mid:activeInGroup('mid').length, high:activeInGroup('high').length};
-    const total = counts.low + counts.mid + counts.high;
+    const gNew=groupOf(idx);
+    const counts={low:activeInGroup('low').length, mid:activeInGroup('mid').length, high:activeInGroup('high').length};
+    const total=counts.low+counts.mid+counts.high;
+    if (total>=MAX_ACTIVE) popOldestGlobal();
 
-    if (total >= MAX_ACTIVE) popOldestGlobal();
-
-    // пересчёт
-    const c = {low:activeInGroup('low').length, mid:activeInGroup('mid').length, high:activeInGroup('high').length};
-
-    // 3 в одной высоте и включается другая — освободить место
-    for (const g of groups){
-      if (c[g] >= 3 && g !== gNew) { popOldestFromGroup(g); return; }
+    const c={low:activeInGroup('low').length, mid:activeInGroup('mid').length, high:activeInGroup('high').length};
+    for (const g of groups){ if (c[g]>=3 && g!==gNew){ popOldestFromGroup(g); return; } }
+    if ([c.low,c.mid,c.high].sort().join(',')==='0,1,2' && c[gNew]===0){
+      const donor=groups.find(g=>c[g]===2); if(donor){ popOldestFromGroup(donor); return; }
     }
-    // 2+1 и приходит третья — гасим дубль
-    if ([c.low, c.mid, c.high].sort().join(',') === '0,1,2' && c[gNew]===0){
-      const donor = groups.find(g => c[g]===2);
-      if (donor) { popOldestFromGroup(donor); return; }
-    }
-    // 3 разных высоты и пришла новая той же высоты — заменяем свою
-    if (['low','mid','high'].every(g => c[g]>0) && c[gNew]>0){
-      popOldestFromGroup(gNew); return;
-    }
+    if (groups.every(g=>c[g]>0) && c[gNew]>0){ popOldestFromGroup(gNew); return; }
   }
 
   function togglePad(idx, el){
     if (!ctx || ctx.state!=='running') return;
-
-    // если первые 10 секунд «вдоха» — блок
-    if (preludePlaying && Date.now() < preludeSoftLockUntil) return;
+    if (preludePlaying && Date.now()<preludeSoftLockUntil) return;
 
     if (active.has(idx)){
       deactivate(idx);
-      el.classList.remove('active');
-    } else {
+    }else{
       balanceBeforeOn(idx);
-      active.add(idx);
-      pushLRU(idx);
-      playLoop(idx);
-      fadeToGain(gains[idx].gain, 1.0, 600);
+      active.add(idx); pushLRU(idx); playLoop(idx); fadeTo(gains[idx].gain, 1.0, 600);
       el.classList.add('active');
     }
   }
 
   function random3(){
-    const arr = [...Array(9).keys()];
-    arr.sort(()=>Math.random()-0.5);
-    const sample = arr.slice(0,3);
-    sample.forEach(i => {
-      const el = E(`.pad[data-idx="${i}"]`);
-      balanceBeforeOn(i);
-      active.add(i);
-      pushLRU(i);
-      playLoop(i);
-      fadeToGain(gains[i].gain, 1.0, 600);
+    const arr=[...Array(9).keys()].sort(()=>Math.random()-0.5).slice(0,3);
+    arr.forEach(i=>{
+      const el=E(`.pad[data-idx="${i}"]`);
+      balanceBeforeOn(i); active.add(i); pushLRU(i); playLoop(i); fadeTo(gains[i].gain,1.0,600);
       el?.classList.add('active');
     });
   }
 
-  function resetAll(){
-    [...active].forEach(i => {
-      deactivate(i);
-      E(`.pad[data-idx="${i}"]`)?.classList.remove('active');
-    });
-    // Сателлиты в этой версии — без автологики (можно добавить при желании)
-  }
+  function resetAll(){ [...active].forEach(deactivate); }
 
   async function inhale(){
     if (preludePlaying) return;
-    preludePlaying = true;
-    preludeSoftLockUntil = Date.now() + 10000; // 10 сек «жёсткой» блокировки
-
-    resetAll();
-    await new Promise(r => setTimeout(r, 300));
-
-    // проиграть all.mp3 один раз, мягко вход/выход
-    const src = ctx.createBufferSource();
-    src.buffer = preludeBuf;
-    const g = ctx.createGain(); g.gain.value = 0.0;
-    src.connect(g); g.connect(master);
-    src.start(0);
-    // fade-in
-    g.gain.setValueAtTime(0, ctx.currentTime);
-    g.gain.linearRampToValueAtTime(1.0, ctx.currentTime + 0.08);
-
-    const length = preludeBuf.duration;
-    // под конец — маленький fadeout
-    const tEnd = ctx.currentTime + length;
-    g.gain.setValueAtTime(1.0, tEnd - 0.15);
-    g.gain.linearRampToValueAtTime(0.0, tEnd);
-
-    src.onended = () => {
-      preludePlaying = false;
-      setStatus('Готово');
-    };
+    preludePlaying=true; preludeSoftLockUntil=Date.now()+10000;
+    resetAll(); await new Promise(r=>setTimeout(r,300));
+    const src=ctx.createBufferSource(); src.buffer=preludeBuf;
+    const g=ctx.createGain(); g.gain.value=0.0; src.connect(g); g.connect(master); src.start(0);
+    g.gain.setValueAtTime(0,ctx.currentTime); g.gain.linearRampToValueAtTime(1.0,ctx.currentTime+0.08);
+    const tEnd=ctx.currentTime+preludeBuf.duration;
+    g.gain.setValueAtTime(1.0,tEnd-0.15); g.gain.linearRampToValueAtTime(0.0,tEnd);
+    src.onended=()=>{ preludePlaying=false; setStatus('Готово'); };
     setStatus('Вдох…');
   }
 
-  // Навешиваем обработчики
-  EA('.pad').forEach(el => {
-    el.addEventListener('click', () => togglePad(+el.dataset.idx, el));
-  });
-  E('#btn-random').addEventListener('click', random3);
-  E('#btn-reset').addEventListener('click', resetAll);
-  E('#btn-inhale').addEventListener('click', inhale);
+  EA('.pad').forEach(el=>el.addEventListener('click',()=>togglePad(+el.dataset.idx, el)));
+  E('#btn-random').addEventListener('click',random3);
+  E('#btn-reset').addEventListener('click',resetAll);
+  E('#btn-inhale').addEventListener('click',inhale);
 })();
 </script>
 </body>
