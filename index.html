@@ -4,327 +4,452 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Installation — web copy</title>
+
+  <!-- мгновенная favicon, чтобы не было 404 -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23000'/%3E%3Ccircle cx='32' cy='32' r='18' fill='%23fff'/%3E%3C/svg%3E">
+
   <style>
     :root{
-      --bg:#000; --fg:#fff; --muted:#aaa;
-      --card:#000; --card-active:#444;
+      --bg:#000; --fg:#fff; --muted:#b5b5b5;
+      --tile:#000; --tile-active:#3d3d3d;
       --ctrl:#111; --ctrl-hover:#1a1a1a;
-      --gap:12px; --pad:16px; --radius:10px;
+      --accent:#0af; --danger:#ff6b6b;
+      --gap:12px; --pad:16px; --radius:12px;
     }
     *{ box-sizing:border-box; }
     html,body{ margin:0; padding:0; background:var(--bg); color:var(--fg);
       font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
     }
+
     header{
-      position:sticky; top:0; z-index:2;
-      background:rgba(0,0,0,.85); backdrop-filter:saturate(140%) blur(6px);
-      border-bottom:1px solid #111; padding:10px var(--pad);
+      position:sticky; top:0; z-index:5;
+      backdrop-filter: saturate(140%) blur(6px);
+      background:rgba(0,0,0,.88);
+      border-bottom:1px solid #111;
     }
-    header .row{ display:flex; gap:12px; align-items:center; justify-content:space-between; max-width:960px; margin:0 auto; }
-    .hint{ color:var(--muted); font-size:14px; }
+    .bar{
+      display:flex; gap:12px; align-items:center; justify-content:space-between;
+      max-width:960px; margin:0 auto; padding:10px var(--pad);
+    }
+    .brand{ font-weight:700; }
+    .status-badge{
+      font-size:13px; color:#000; background:#fff; border-radius:999px;
+      padding:6px 10px; min-width:120px; text-align:center;
+    }
+    .status-badge.loading{ background:#ffd64d; }
+    .status-badge.ready{ background:#9cff7a; }
+    .status-badge.busy{ background:#7abaff; }
+    .status-badge.error{ background:#ff9c9c; }
+
     .wrap{ max-width:960px; margin:0 auto; padding:var(--pad); }
-    .grid{ display:grid; gap:var(--gap); grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); }
-    .pad, .ctrl{
-      background:var(--card); color:var(--fg); cursor:pointer; user-select:none;
-      display:grid; place-items:center; text-align:center; border:none; border-radius:var(--radius);
-      transition: transform .06s ease, opacity .2s ease, background-color .15s ease;
+
+    .hint{ color:var(--muted); font-size:14px; }
+
+    /* ГРУППЫ: Низы / Середины / Верхи */
+    .groups{ display:grid; gap:16px; }
+    @media (min-width: 860px){
+      .groups{ grid-template-columns: 1fr 1fr 1fr; }
     }
-    .pad{ aspect-ratio:1/1; font-weight:600; font-size:22px; }
+    .group{
+      background:#0a0a0a; border:1px solid #161616; border-radius:14px; padding:12px;
+    }
+    .group h3{
+      margin:0 0 8px; font-size:14px; font-weight:700; letter-spacing:.02em; color:#dcdcdc;
+    }
+    .grid3{
+      display:grid; gap:var(--gap);
+      grid-template-columns: repeat(3, minmax(0,1fr));
+    }
+
+    /* Плитки-пэды */
+    .pad, .ctrl{
+      background:var(--tile); color:var(--fg);
+      cursor:pointer; user-select:none;
+      display:grid; place-items:center; text-align:center;
+      border:none; border-radius:var(--radius);
+      transition: transform .07s ease, opacity .2s ease, background-color .2s ease;
+    }
+    .pad{
+      aspect-ratio:1/1; font-weight:700; font-size:22px;
+    }
     .pad:active{ transform:scale(.98); }
-    .pad.active{ background:var(--card-active); }
-    .ctrl{ padding:12px 14px; background:var(--ctrl); font-weight:600; }
+    .pad.active{ background:var(--tile-active); }
+
+    /* Кнопки управления */
+    .controls{
+      display:grid; gap:var(--gap); margin-top:16px;
+      grid-template-columns: repeat(auto-fit,minmax(160px,1fr));
+    }
+    .ctrl{ padding:12px 14px; background:var(--ctrl); font-weight:700; }
     .ctrl:hover{ background:var(--ctrl-hover); }
     .ctrl:active{ transform:scale(.98); }
-    .row2{ display:grid; gap:var(--gap); grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); margin-top:var(--gap); }
-    .err{ color:#ff6b6b; font-size:14px; margin-top:8px; white-space:pre-wrap; }
-    .status{ font-size:13px; color:var(--muted); margin-top:6px; }
+
+    .err{ color:var(--danger); font-size:14px; margin-top:10px; white-space:pre-wrap; }
+
+    /* Оверлей разблокировки звука */
     .overlay{
-      position:fixed; inset:0; z-index:10; background:#000; color:var(--fg);
-      display:flex; align-items:center; justify-content:center; padding:24px; text-align:center; border:3px dashed #222;
+      position:fixed; inset:0; z-index:10;
+      background:#000; color:var(--fg);
+      display:flex; align-items:center; justify-content:center;
+      padding:24px; text-align:center;
+      border:3px dashed #222;
     }
     .overlay button{
-      border:none; background:#fff; color:#000; padding:12px 18px; font-weight:700; cursor:pointer; border-radius:12px;
+      border:none; background:#fff; color:#000; padding:12px 18px;
+      font-weight:800; cursor:pointer; border-radius:12px;
     }
-    .overlay .hint{ color:#bbb; }
-    .pad:focus-visible, .ctrl:focus-visible, .overlay button:focus-visible{ outline:2px solid #888; outline-offset:2px; }
+    .overlay .hint{ color:#bbb; margin-top:8px; }
+
+    /* доступность */
+    .pad:focus-visible, .ctrl:focus-visible, .overlay button:focus-visible{
+      outline:2px solid #888; outline-offset:2px;
+    }
   </style>
 </head>
 <body>
   <header>
-    <div class="row">
-      <div><strong>Веб-копия инсталляции</strong></div>
-      <div class="hint">сначала «Включить звук», затем кнопки</div>
+    <div class="bar">
+      <div class="brand">Веб-копия инсталляции</div>
+      <div class="status-badge loading" id="status">Загружаю…</div>
     </div>
   </header>
 
   <div class="wrap">
+    <p class="hint" style="margin-top:0">Сначала нажмите «Включить звук», затем кнопки. На iPhone выключите режим без звука.</p>
+
     <div id="error" class="err" hidden></div>
 
-    <div class="grid" id="pads">
-      <button class="pad" data-idx="0">0</button>
-      <button class="pad" data-idx="1">1</button>
-      <button class="pad" data-idx="2">2</button>
-      <button class="pad" data-idx="3">3</button>
-      <button class="pad" data-idx="4">4</button>
-      <button class="pad" data-idx="5">5</button>
-      <button class="pad" data-idx="6">6</button>
-      <button class="pad" data-idx="7">7</button>
-      <button class="pad" data-idx="8">8</button>
-    </div>
+    <!-- Явные группы высот -->
+    <section class="groups">
+      <div class="group" aria-label="Низы">
+        <h3>Низы</h3>
+        <div class="grid3">
+          <button class="pad" data-idx="0">0</button>
+          <button class="pad" data-idx="1">1</button>
+          <button class="pad" data-idx="2">2</button>
+        </div>
+      </div>
 
-    <div class="row2" style="margin-top:16px">
+      <div class="group" aria-label="Середины">
+        <h3>Середины</h3>
+        <div class="grid3">
+          <button class="pad" data-idx="3">3</button>
+          <button class="pad" data-idx="4">4</button>
+          <button class="pad" data-idx="5">5</button>
+        </div>
+      </div>
+
+      <div class="group" aria-label="Верхи">
+        <h3>Верхи</h3>
+        <div class="grid3">
+          <button class="pad" data-idx="6">6</button>
+          <button class="pad" data-idx="7">7</button>
+          <button class="pad" data-idx="8">8</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="controls">
       <button id="btn-inhale" class="ctrl">Вдох (all)</button>
       <button id="btn-random" class="ctrl">Случайные 3</button>
       <button id="btn-reset" class="ctrl">Сброс</button>
     </div>
-
-    <div class="status" id="status">Готово</div>
   </div>
 
+  <!-- Оверлей разблокировки звука -->
   <div class="overlay" id="gate">
     <div>
       <p style="margin-top:0">Браузеры блокируют звук до жеста пользователя.</p>
       <button id="unlock">Включить звук</button>
-      <div class="hint" style="margin-top:8px">на iPhone снимите беззвучный режим</div>
+      <div class="hint">на iPhone снимите беззвучный режим</div>
     </div>
   </div>
 
 <script>
-(() => {
+(()=>{
+
+  // ===== helpers =====
   const E  = (sel, root=document) => root.querySelector(sel);
   const EA = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+  const status = E('#status');
+  const errBox = E('#error');
+  const gate   = E('#gate');
+  const btnUnlock = E('#unlock');
 
-  const errBox   = E('#error');
-  const statusBox= E('#status');
-  const gate     = E('#gate');
-  const btnUnlock= E('#unlock');
-
-  // файлы
   const files = [
     'sounds/00.mp3','sounds/01.mp3','sounds/02.mp3',
     'sounds/03.mp3','sounds/04.mp3','sounds/05.mp3',
     'sounds/06.mp3','sounds/07.mp3','sounds/08.mp3'
   ];
-  const satFiles = { low:'sounds/down.mp3', mid:'sounds/middle.mp3', high:'sounds/up.mp3' };
+  const satellites = { low:'sounds/down.mp3', mid:'sounds/middle.mp3', high:'sounds/up.mp3' };
   const prelude = 'sounds/all.mp3';
-
-  // параметры
   const groupOf = i => (i<=2?'low': i<=5?'mid':'high');
   const groups = ['low','mid','high'];
   const MAX_ACTIVE = 3;
-  const FADE_MS = 4000;
-  const SAT_LEVEL = 0.8;
-  const SAT_DELAY_MS = 4000;
+  const SATELLITE_DELAY_MS = 4000;    // как на «железе»: через 4 сек при тройке
+  const FADE_MS = 1200;               // плавнее
+  const SAT_FADE_MS = 1200;
 
-  // состояние
   let ctx, master;
-  let gains=[], buffers=[], preludeBuf=null;
-  let active = new Set(), lru = [], groupQueues = {low:[],mid:[],high:[]};
+  let gains = [];             // по 9, громкости лупов
+  let buffers = [];           // по 9
+  let loopNodes = [];         // BufferSource по 9 (всегда крутятся)
+  let active = new Set();     // индексы включённых плиток
+  let lru = [];               // порядок активаций (LRU)
+  let groupQueues = {low:[], mid:[], high:[]};
+
+  // сателлиты
+  let satBuffers = {};        // per group
+  let satGains   = {};        // per group GainNode
+  let satNodes   = {};        // per group BufferSource (loop)
+  let satTarget  = {low:0, mid:0, high:0};   // цель громкости
+  let satLast3At = {low:0, mid:0, high:0};   // когда стало 3 активных в группе
+
+  // вдох
+  let preludeBuf = null;
   let preludePlaying = false;
   let preludeSoftLockUntil = 0;
 
-  const sat = {
-    low:  { gain:null, buffer:null, timer:0, on:false },
-    mid:  { gain:null, buffer:null, timer:0, on:false },
-    high: { gain:null, buffer:null, timer:0, on:false }
-  };
+  function setStatus(text, cls='ready'){
+    status.textContent = text;
+    status.className = 'status-badge ' + cls;
+  }
+  function showErr(msg){
+    errBox.hidden = false;
+    errBox.textContent = msg;
+    setStatus('Ошибка', 'error');
+    console.error(msg);
+  }
 
-  function setStatus(t){ if(statusBox) statusBox.textContent=t; }
-  function showErr(msg){ if(!errBox) return; errBox.hidden=false; errBox.textContent=msg; console.error(msg); }
-  function nowMs(){ return performance.now(); }
-
-  btnUnlock?.addEventListener('click', async () => {
+  // ===== Audio init on user gesture =====
+  btnUnlock.addEventListener('click', async ()=>{
     try{
       if (!ctx){
-        ctx = new (window.AudioContext || window.webkitAudioContext)({latencyHint:'interactive'});
+        ctx = new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'});
         master = ctx.createGain(); master.gain.value = 0.95; master.connect(ctx.destination);
 
-        // основные каналы (gain)
-        for (let i=0;i<files.length;i++){
-          const g=ctx.createGain();
-          g.gain.value=0.0; g.connect(master); gains[i]=g;
+        // основные gain-каналы
+        for (let i=0;i<9;i++){
+          const g = ctx.createGain(); g.gain.value = 0.0; g.connect(master); gains[i] = g;
         }
-        // сателлиты (gain)
+        // сателлиты gain-каналы
         for (const k of groups){
-          const g=ctx.createGain();
-          g.gain.value=0.0; g.connect(master); sat[k].gain=g;
+          const g = ctx.createGain(); g.gain.value = 0.0; g.connect(master); satGains[k] = g;
         }
 
-        setStatus('Загружаю звуки…');
+        setStatus('Загружаю звуки…','loading');
         await loadAllAudio();
-
-        // запустить вечные лупы (основные)
-        for (let i=0;i<files.length;i++){
-          const src = ctx.createBufferSource();
-          src.buffer = buffers[i]; src.loop = true; src.connect(gains[i]); src.start(0);
-        }
-        // сателлиты — тоже в луп
-        for (const k of groups){
-          const s = ctx.createBufferSource();
-          s.buffer = sat[k].buffer; s.loop = true; s.connect(sat[k].gain); s.start(0);
-        }
-
-        startSatWatcher();
-        setStatus('Готово. Нажимайте кнопки.');
+        startAllLoops(); // сразу запускаем 9 лупов «в фоне»
+        setStatus('Готово. Нажимайте кнопки.','ready');
       }
       await ctx.resume();
-      gate && gate.remove();
+      gate.remove();
     }catch(e){
       showErr('Не удалось инициализировать звук: '+e.message);
     }
   });
 
   async function fetchBuf(url){
-    const r=await fetch(url,{cache:'no-cache'});
-    if(!r.ok) throw new Error(url+' → '+r.status+' '+r.statusText);
+    const r = await fetch(url,{cache:'no-cache'});
+    if (!r.ok) throw new Error(url+' → '+r.status+' '+r.statusText);
     return await r.arrayBuffer();
   }
-  async function decode(url){ return await ctx.decodeAudioData(await fetchBuf(url)); }
+  async function decode(url){
+    return await ctx.decodeAudioData(await fetchBuf(url));
+  }
   async function loadAllAudio(){
     try{
-      buffers   = await Promise.all(files.map(decode));
-      preludeBuf= await decode(prelude);
-      for (const [k,u] of Object.entries(satFiles)){ sat[k].buffer = await decode(u); }
+      // основные (00..08)
+      buffers = await Promise.all(files.map(decode));
+      // сателлиты
+      for (const [k, url] of Object.entries(satellites)){
+        satBuffers[k] = await decode(url);
+      }
+      // прелюдия
+      preludeBuf = await decode(prelude);
     }catch(e){
-      showErr('Ошибка загрузки аудио. Проверьте пути и имена файлов.\n'+e.message);
+      showErr('Ошибка загрузки аудио. Проверьте пути/имена файлов.\n'+e.message);
       throw e;
     }
   }
 
-  function fadeTo(param,to,ms=FADE_MS){
-    const t=ctx.currentTime;
-    param.cancelScheduledValues(t);
-    param.setValueAtTime(param.value, t);
-    param.linearRampToValueAtTime(to, t + ms/1000);
+  function startAllLoops(){
+    // 9 постоянных источников
+    for (let i=0;i<9;i++){
+      const src = ctx.createBufferSource();
+      src.buffer = buffers[i];
+      src.loop = true;
+      src.connect(gains[i]);
+      src.start(0);
+      loopNodes[i] = src;
+    }
   }
 
+  // сателлит — создать и запустить, если ещё не
+  function ensureSatRunning(g){
+    if (satNodes[g]) return;
+    const src = ctx.createBufferSource();
+    src.buffer = satBuffers[g];
+    src.loop = true;
+    src.connect(satGains[g]);
+    src.start(0);
+    satNodes[g] = src;
+  }
+
+  // плавные фейды
+  function fadeTo(param, to, ms=FADE_MS){
+    const now = ctx.currentTime;
+    param.cancelScheduledValues(now);
+    param.setValueAtTime(param.value, now);
+    param.linearRampToValueAtTime(to, now + ms/1000);
+  }
+
+  // LRU и групповые очереди
   function pushLRU(idx){
-    lru = lru.filter(i=>i!==idx); lru.push(idx);
-    const g=groupOf(idx);
-    groupQueues[g]=groupQueues[g].filter(i=>i!==idx);
+    lru = lru.filter(i=>i!==idx);
+    lru.push(idx);
+    const g = groupOf(idx);
+    groupQueues[g] = groupQueues[g].filter(i=>i!==idx);
     groupQueues[g].push(idx);
   }
-  function popOldestGlobal(){ if(!lru.length) return; const v=lru.shift(); deactivate(v); }
-  function popOldestFromGroup(g){ if(!groupQueues[g].length) return; const v=groupQueues[g].shift(); deactivate(v); }
-  function activeInGroup(g){ return [...active].filter(i=>groupOf(i)===g); }
+  function popOldestGlobal(){
+    if (!lru.length) return null;
+    const v = lru.shift();
+    deactivate(v);
+    return v;
+  }
+  function popOldestFromGroup(g){
+    if (!groupQueues[g].length) return null;
+    const v = groupQueues[g].shift();
+    deactivate(v);
+    return v;
+  }
 
   function deactivate(idx){
     if (!active.has(idx)) return;
     active.delete(idx);
     lru = lru.filter(i=>i!==idx);
-    const g=groupOf(idx);
-    groupQueues[g]=groupQueues[g].filter(i=>i!==idx);
-    fadeTo(gains[idx].gain, 0.0);
+    const g = groupOf(idx);
+    groupQueues[g] = groupQueues[g].filter(i=>i!==idx);
+    fadeTo(gains[idx].gain, 0.0, FADE_MS);
     E(`.pad[data-idx="${idx}"]`)?.classList.remove('active');
   }
 
-  function balanceBeforeOn(idx){
-    const gNew=groupOf(idx);
-    const counts={low:activeInGroup('low').length, mid:activeInGroup('mid').length, high:activeInGroup('high').length};
-    const total=counts.low+counts.mid+counts.high;
-    if (total>=MAX_ACTIVE) popOldestGlobal();
+  function activeInGroup(g){
+    return [...active].filter(i=>groupOf(i)===g);
+  }
 
-    const c={low:activeInGroup('low').length, mid:activeInGroup('mid').length, high:activeInGroup('high').length};
-    for (const g of groups){ if (c[g]>=3 && g!==gNew){ popOldestFromGroup(g); return; } }
+  function balanceBeforeOn(idx){
+    const gNew = groupOf(idx);
+    const counts = { low:activeInGroup('low').length, mid:activeInGroup('mid').length, high:activeInGroup('high').length };
+    const total = counts.low + counts.mid + counts.high;
+
+    if (total >= MAX_ACTIVE) popOldestGlobal();
+
+    const c = { low:activeInGroup('low').length, mid:activeInGroup('mid').length, high:activeInGroup('high').length };
+    for (const g of groups){
+      if (c[g] >= 3 && g !== gNew){ popOldestFromGroup(g); return; }
+    }
     if ([c.low,c.mid,c.high].sort().join(',')==='0,1,2' && c[gNew]===0){
-      const donor=groups.find(g=>c[g]===2); if(donor){ popOldestFromGroup(donor); return; }
+      const donor = groups.find(g=>c[g]===2);
+      if (donor){ popOldestFromGroup(donor); return; }
     }
     if (groups.every(g=>c[g]>0) && c[gNew]>0){ popOldestFromGroup(gNew); return; }
   }
 
+  // ===== UI actions =====
   function togglePad(idx, el){
     if (!ctx || ctx.state!=='running') return;
-    if (preludePlaying && performance.now()<preludeSoftLockUntil) return;
+    if (preludePlaying && Date.now()<preludeSoftLockUntil) return;
 
     if (active.has(idx)){
       deactivate(idx);
-    }else{
+    } else {
       balanceBeforeOn(idx);
-      active.add(idx);
-      pushLRU(idx);
-      fadeTo(gains[idx].gain, 1.0);
+      active.add(idx); pushLRU(idx);
+      fadeTo(gains[idx].gain, 1.0, FADE_MS);
       el.classList.add('active');
     }
+    checkSatellites(); // обновить логику сателлитов на каждое действие
   }
 
   function random3(){
     const arr=[...Array(9).keys()].sort(()=>Math.random()-0.5).slice(0,3);
     arr.forEach(i=>{
-      const el=E(`.pad[data-idx="${i}"]`);
+      const el = E(`.pad[data-idx="${i}"]`);
       balanceBeforeOn(i);
-      active.add(i);
-      pushLRU(i);
-      fadeTo(gains[i].gain,1.0);
+      active.add(i); pushLRU(i);
+      fadeTo(gains[i].gain, 1.0, FADE_MS);
       el?.classList.add('active');
     });
+    checkSatellites();
   }
 
   function resetAll(){
     [...active].forEach(deactivate);
-    for (const k of groups){
-      fadeTo(sat[k].gain.gain, 0.0);
-      sat[k].timer = 0;
-      sat[k].on = false;
+    satTarget = {low:0,mid:0,high:0};
+    for (const g of groups) fadeTo(satGains[g].gain, 0.0, SAT_FADE_MS);
+  }
+
+  // ===== satellites logic =====
+  function checkSatellites(){
+    const now = performance.now();
+    for (const g of groups){
+      const n = activeInGroup(g).length;
+      if (n >= 3){
+        if (satLast3At[g]===0) satLast3At[g] = now;
+        if (now - satLast3At[g] >= SATELLITE_DELAY_MS){
+          ensureSatRunning(g);
+          satTarget[g] = 0.8;
+          fadeTo(satGains[g].gain, satTarget[g], SAT_FADE_MS);
+        }
+      } else {
+        satLast3At[g] = 0;
+        satTarget[g] = 0.0;
+        fadeTo(satGains[g].gain, 0.0, SAT_FADE_MS);
+      }
     }
   }
 
+  // ===== inhale (all) =====
   async function inhale(){
+    if (!ctx || ctx.state!=='running') return;
     if (preludePlaying) return;
-    preludePlaying=true;
-    preludeSoftLockUntil = performance.now() + 10000;
+    preludePlaying = true;
+    preludeSoftLockUntil = Date.now() + 10000; // первые 10 секунд — «жёсткая» блокировка
 
+    setStatus('Вдох…','busy');
     resetAll();
     await new Promise(r=>setTimeout(r,300));
 
-    const src=ctx.createBufferSource();
-    src.buffer=preludeBuf;
-    const g=ctx.createGain(); g.gain.value=0.0;
-    src.connect(g); g.connect(master);
-    src.start(0);
+    const src = ctx.createBufferSource();
+    src.buffer = preludeBuf;
+    const g = ctx.createGain(); g.gain.value = 0.0;
+    src.connect(g); g.connect(master); src.start(0);
 
-    const t=ctx.currentTime, dur=preludeBuf.duration;
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(1.0, t+0.2);
-    g.gain.setValueAtTime(1.0, t+dur-0.2);
-    g.gain.linearRampToValueAtTime(0.0, t+dur);
+    // мягкий вход/выход
+    const t0 = ctx.currentTime;
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(1.0, t0 + 0.08);
+    const tEnd = t0 + preludeBuf.duration;
+    g.gain.setValueAtTime(1.0, tEnd - 0.2);
+    g.gain.linearRampToValueAtTime(0.0, tEnd);
 
-    src.onended = () => { preludePlaying=false; setStatus('Готово'); };
-    setStatus('Вдох…');
-  }
-
-  function startSatWatcher(){
-    const tick = () => {
-      if (!ctx) return;
-      const t = performance.now();
-
-      for (const k of groups){
-        const count = activeInGroup(k).length;
-        const st = sat[k];
-        if (count >= 3){
-          if (st.timer === 0) st.timer = t;
-          const dt = t - st.timer;
-          if (!st.on && dt >= SAT_DELAY_MS){
-            fadeTo(st.gain.gain, SAT_LEVEL);
-            st.on = true;
-          }
-        } else {
-          if (st.on){
-            fadeTo(st.gain.gain, 0.0);
-            st.on = false;
-          }
-          st.timer = 0;
-        }
-      }
-      setTimeout(tick, 100);
+    src.onended = () => {
+      preludePlaying = false;
+      setStatus('Готово','ready');
     };
-    tick();
   }
 
-  EA('.pad').forEach(el=>el.addEventListener('click',()=>togglePad(+el.dataset.idx, el)));
-  E('#btn-random')?.addEventListener('click',random3);
-  E('#btn-reset') ?.addEventListener('click',resetAll);
-  E('#btn-inhale')?.addEventListener('click',inhale);
+  // ===== wire UI =====
+  EA('.pad').forEach(el=> el.addEventListener('click', ()=>togglePad(+el.dataset.idx, el)));
+  E('#btn-random').addEventListener('click', random3);
+  E('#btn-reset').addEventListener('click', resetAll);
+  E('#btn-inhale').addEventListener('click', inhale);
+
+  // первоначальный статус
+  setStatus('Ожидание разрешения звука','loading');
+
 })();
 </script>
 </body>
