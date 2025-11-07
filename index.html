@@ -1,17 +1,426 @@
 <!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>sound installation (stub)</title>
-  <style>
-    body{font-family:system-ui,Arial,sans-serif;margin:2rem;line-height:1.5}
-    .ok{display:inline-block;padding:.5rem .75rem;border:1px solid #000}
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Installation (web)</title>
+<style>
+  :root{
+    --bg:#fff; --fg:#000; --muted:#666;
+    --btn:120px; --gap:14px; --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--fg);
+    font:16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  .app{width:100%; max-width:820px}
+  h1{font-size:20px; margin:0 0 12px 0}
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:var(--gap);
+  }
+  .btn{
+    aspect-ratio:1/1;
+    border:2px solid #000; border-radius:var(--radius);
+    background:#fff; color:#000; font-weight:600;
+    display:flex; align-items:center; justify-content:center;
+    font-size:22px; user-select:none; cursor:pointer;
+    transition:transform .05s ease, background .2s ease;
+    touch-action:manipulation;
+  }
+  .btn:active{transform:scale(.98)}
+  .btn.active{background:#f7f7f7}
+  .row{display:grid; grid-template-columns:repeat(3,1fr); gap:var(--gap); margin-top:var(--gap)}
+  .muted{color:var(--muted); font-size:13px; margin-top:10px}
+  .overlay{
+    position:fixed; inset:0; background:#fff;
+    display:flex; align-items:center; justify-content:center; flex-direction:column;
+    gap:12px; z-index:10; padding:24px; text-align:center;
+  }
+  .overlay button{
+    padding:14px 18px; border:2px solid #000; border-radius:12px; background:#fff; font-weight:700; cursor:pointer;
+  }
+  .bar{
+    display:flex; gap:8px; align-items:center; margin:6px 0 14px;
+    font-size:14px; flex-wrap:wrap;
+  }
+  .pill{border:1px solid #000; border-radius:999px; padding:4px 10px}
+  @media (max-width:520px){
+    :root{--btn:96px}
+    .btn{font-size:20px}
+  }
+</style>
 </head>
 <body>
-  <h1>Сайт жив 👋</h1>
-  <p>GitHub Pages теперь можно включать. Потом заменим этот файл на полноценную версию.</p>
-  <span class="ok">index.html найден</span>
+<div class="app">
+  <h1>Веб-копия инсталляции</h1>
+
+  <div class="bar">
+    <span class="pill">0–8 — звуки</span>
+    <span class="pill">9 — вдох (10 cек блок)</span>
+    <span class="pill">10 — случайные 3</span>
+    <span class="pill">11 — сброс</span>
+  </div>
+
+  <!-- 3×4 -->
+  <div class="grid" id="grid">
+    <!-- 0..8 -->
+    <button class="btn" data-id="0">0</button>
+    <button class="btn" data-id="1">1</button>
+    <button class="btn" data-id="2">2</button>
+
+    <button class="btn" data-id="3">3</button>
+    <button class="btn" data-id="4">4</button>
+    <button class="btn" data-id="5">5</button>
+
+    <button class="btn" data-id="6">6</button>
+    <button class="btn" data-id="7">7</button>
+    <button class="btn" data-id="8">8</button>
+
+    <!-- 9..11 -->
+    <button class="btn" data-id="9">9</button>
+    <button class="btn" data-id="10">10</button>
+    <button class="btn" data-id="11">11</button>
+  </div>
+
+  <div class="muted">
+    Подсказка: если в браузере нет звука, нажми «Включить звук» при первом заходе.
+  </div>
+</div>
+
+<!-- Мобильная/браузерная разблокировка звука -->
+<div class="overlay" id="gate">
+  <div style="font-size:18px; font-weight:700;">Нажми кнопку, чтобы включить звук</div>
+  <div class="muted">Браузер просит «жест» пользователя для аудио.</div>
+  <button id="gateBtn">Включить звук</button>
+</div>
+
+<script>
+(() => {
+  // ---------- Константы / параметры ----------
+  const FADE_DURATION = 6.0;           // сек
+  const UPDATE_INTERVAL = 1/60;        // ~60fps
+  const SATELLITE_DELAY = 4.0;         // сек, как у тебя
+  const MAX_ACTIVE = 3;                // без учета сателлитов
+  const SOFT_LOCK_AFTER_INHALE = 10.0; // 10 секунд
+  const MASTER_GAIN = 1.0;             // общий множитель в вебе оставим 1.0
+
+  const groups = ["low","mid","high"]; // 0-2 low, 3-5 mid, 6-8 high
+  const soundToGroup = i => (i<=2 ? "low" : i<=5 ? "mid" : "high");
+
+  // ---------- Аудиоконтекст / узлы ----------
+  let ctx;
+  let masterGain;
+  function ensureAudio(){
+    if (ctx) return;
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = ctx.createGain();
+    masterGain.gain.value = MASTER_GAIN;
+    masterGain.connect(ctx.destination);
+  }
+
+  // Создаем проигрыватели (по одному на звук) — через MediaElementAudioSource с loop
+  function makeLoopingAudio(file){
+    const el = new Audio(file);
+    el.loop = true;
+    el.preload = "auto";
+    el.crossOrigin = "anonymous";
+    const src = ctx.createMediaElementSource(el);
+    const g = ctx.createGain();
+    g.gain.value = 0.0;
+    src.connect(g).connect(masterGain);
+    return {el, gain:g};
+  }
+
+  function makeOneShot(file){
+    const el = new Audio(file);
+    el.loop = false;
+    el.preload = "auto";
+    el.crossOrigin = "anonymous";
+    const src = ctx.createMediaElementSource(el);
+    const g = ctx.createGain();
+    g.gain.value = 1.0;
+    src.connect(g).connect(masterGain);
+    return {el, gain:g};
+  }
+
+  // ---------- Загрузка звуков ----------
+  const mains = []; // 0..8
+  const satellites = {
+    low:  null,
+    mid:  null,
+    high: null
+  };
+  let prelude = null;
+
+  // Состояния
+  const target = Array(9).fill(0);
+  const current = Array(9).fill(0);
+  const activationOrder = [];                 // LRU (массив индексов 0..8)
+  const activationByGroup = {low:[], mid:[], high:[]};
+
+  const satTarget = {low:0, mid:0, high:0};
+  const satCurrent = {low:0, mid:0, high:0};
+  const satTimer = {low:0, mid:0, high:0};    // timestamp когда стало 3 активных
+
+  let preludePlaying = false;
+  let preludeSoftLockUntil = 0;
+
+  function inActivationOrderRemove(i){
+    const k = activationOrder.indexOf(i);
+    if (k>=0) activationOrder.splice(k,1);
+  }
+  function activationByGroupRemove(g, i){
+    const arr = activationByGroup[g];
+    const k = arr.indexOf(i);
+    if (k>=0) arr.splice(k,1);
+  }
+  function pushActivation(i){
+    const g = soundToGroup(i);
+    inActivationOrderRemove(i);
+    activationOrder.push(i);
+    activationByGroupRemove(g,i);
+    activationByGroup[g].push(i);
+  }
+  function removeActivation(i){
+    const g = soundToGroup(i);
+    inActivationOrderRemove(i);
+    activationByGroupRemove(g,i);
+  }
+  function popOldestGlobal(){
+    if (activationOrder.length){
+      const victim = activationOrder.shift();
+      target[victim] = 0;
+      removeActivation(victim);
+      log(`Выключаю старейший звук ${victim}`);
+      return victim;
+    }
+  }
+  function popOldestFromGroup(g){
+    const arr = activationByGroup[g];
+    if (arr.length){
+      const victim = arr.shift();
+      target[victim] = 0;
+      removeActivation(victim);
+      log(`Гашу старейший звук ${victim} в группе ${g}`);
+      return victim;
+    }
+  }
+  function activeIndices(thr=0.2){
+    const a=[];
+    for (let i=0;i<9;i++) if (target[i]>thr) a.push(i);
+    return a;
+  }
+  function activeInGroup(g){
+    return activeIndices().filter(i => soundToGroup(i)===g);
+  }
+
+  // ---------- Баланс правил перед включением ----------
+  function balanceBeforeTurnOn(newIdx){
+    const gNew = soundToGroup(newIdx);
+    let counts = {low:activeInGroup("low").length,
+                  mid:activeInGroup("mid").length,
+                  high:activeInGroup("high").length};
+    const total = counts.low + counts.mid + counts.high;
+
+    if (total >= MAX_ACTIVE){
+      log("Достигнут лимит 3 звука — убираю старейший");
+      popOldestGlobal();
+    }
+    counts = {low:activeInGroup("low").length,
+              mid:activeInGroup("mid").length,
+              high:activeInGroup("high").length};
+
+    for (const g of groups){
+      if (counts[g] >= 3 && g!==gNew){
+        log(`Три ${g}, включается ${gNew} — освобождаю место`);
+        popOldestFromGroup(g);
+        return;
+      }
+    }
+
+    const tri = [counts.low, counts.mid, counts.high].sort((a,b)=>a-b);
+    if (tri[0]===0 && tri[1]===1 && tri[2]===2 && counts[gNew]===0){
+      const donor = groups.find(g => counts[g]===2);
+      log(`В ${donor} дубль, а ${gNew} пустая — балансирую`);
+      popOldestFromGroup(donor);
+      return;
+    }
+
+    const nonzero = Object.values(counts).filter(c=>c>0).length;
+    if (nonzero===3 && counts[gNew]>0){
+      log(`Все три высоты активны, новая ${gNew} заменяет старую ${gNew}`);
+      popOldestFromGroup(gNew);
+      return;
+    }
+  }
+
+  // ---------- Фейдер (основные и сателлиты) ----------
+  function stepToward(cur, trg){
+    const step = (1.0 / (FADE_DURATION / UPDATE_INTERVAL));
+    if (Math.abs(trg-cur) < 1e-3) return trg;
+    if (trg>cur) cur += step; else cur -= step;
+    if (cur<0) cur=0; if (cur>1) cur=1;
+    return cur;
+  }
+
+  function tick(){
+    // основные
+    for (let i=0;i<9;i++){
+      const c = current[i];
+      const t = target[i];
+      const n = stepToward(c,t);
+      if (n!==c){
+        current[i]=n;
+        mains[i].gain.gain.setValueAtTime(n, ctx.currentTime);
+        const btn = buttons[i];
+        if (btn) btn.classList.toggle('active', n>0.2);
+      }
+    }
+    // сателлиты
+    for (const g of groups){
+      const c = satCurrent[g], t = satTarget[g];
+      const n = stepToward(c,t);
+      if (n!==c){
+        satCurrent[g]=n;
+        satellites[g].gain.gain.setValueAtTime(n, ctx.currentTime);
+      }
+    }
+  }
+
+  function rafLoop(){
+    tick();
+    requestAnimationFrame(rafLoop);
+  }
+
+  // ---------- Действия ----------
+  function actuallyTurnOn(i){
+    target[i]=1.0;
+    pushActivation(i);
+  }
+  function actuallyTurnOff(i){
+    target[i]=0.0;
+    removeActivation(i);
+  }
+  function activateSound(i){
+    if (target[i]>0.2){
+      actuallyTurnOff(i);
+      log(`Выключен ${i}`);
+    }else{
+      balanceBeforeTurnOn(i);
+      actuallyTurnOn(i);
+      log(`Включен ${i}`);
+    }
+  }
+  function randomTrigger(){
+    const pool = [...Array(9).keys()];
+    shuffle(pool);
+    const pick = pool.slice(0,3);
+    pick.forEach(i => { balanceBeforeTurnOn(i); actuallyTurnOn(i); });
+    log("Случайная активация трёх звуков");
+  }
+  function resetAll(){
+    for (let i=0;i<9;i++) actuallyTurnOff(i);
+    for (const g of groups) satTarget[g]=0;
+    for (const g of groups) satTimer[g]=0;
+    log("Сброс выполнен");
+  }
+  function checkSatellites(){
+    const now = performance.now()/1000;
+    for (const g of groups){
+      const n = activeInGroup(g).length;
+      const wasOn = satTarget[g]>0;
+      if (n>=3){
+        if (satTimer[g]===0) satTimer[g]=now;
+        else if ((now - satTimer[g]) >= SATELLITE_DELAY){
+          satTarget[g]=0.8;
+          if (!wasOn) log(`Сателлит ${g} включён`);
+        }
+      }else{
+        if (wasOn) log(`Сателлит ${g} выключен`);
+        satTarget[g]=0;
+        satTimer[g]=0;
+      }
+    }
+  }
+
+  // ВДОХ (9)
+  function triggerInhale(){
+    if (preludePlaying) return;
+    preludePlaying = true;
+    preludeSoftLockUntil = performance.now()/1000 + SOFT_LOCK_AFTER_INHALE;
+    log("Вдох — выключаю все активные звуки и запускаю all.mp3");
+
+    resetAll();
+    setTimeout(()=>{
+      prelude.el.currentTime = 0;
+      prelude.gain.gain.setValueAtTime(1.0, ctx.currentTime);
+      prelude.el.play().catch(()=>{});
+      // мониторим окончание
+      const onEnd = () => {
+        prelude.el.removeEventListener('ended', onEnd);
+        preludePlaying = false;
+        log("Вдох завершён, система снова готова");
+      };
+      prelude.el.addEventListener('ended', onEnd);
+    }, 250);
+  }
+
+  // ---------- UI ----------
+  const buttons = Array.from(document.querySelectorAll('.btn'));
+  buttons.forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      if (!ctx || ctx.state!=='running') return;
+      const id = Number(btn.dataset.id);
+      const nowSec = performance.now()/1000;
+      // В первые 10 секунд после старта «вдоха» — глухо
+      if (preludePlaying && nowSec < preludeSoftLockUntil) return;
+
+      if (id<9) activateSound(id);
+      else if (id===9) triggerInhale();
+      else if (id===10) randomTrigger();
+      else if (id===11) resetAll();
+    }, {passive:true});
+  });
+
+  // ---------- Ворота (разблокировка звука) ----------
+  const gate = document.getElementById('gate');
+  document.getElementById('gateBtn').addEventListener('click', async ()=>{
+    ensureAudio();
+    // создать ноды
+    for (let i=0;i<9;i++) mains[i] = makeLoopingAudio(`sounds/${String(i).padStart(2,'0')}.mp3`);
+    satellites.low  = makeLoopingAudio('sounds/down.mp3');
+    satellites.mid  = makeLoopingAudio('sounds/middle.mp3');
+    satellites.high = makeLoopingAudio('sounds/up.mp3');
+    prelude = makeOneShot('sounds/all.mp3');
+
+    // запустить петли (молчаливо)
+    for (let i=0;i<9;i++) mains[i].el.play().catch(()=>{});
+    satellites.low.el.play().catch(()=>{});
+    satellites.mid.el.play().catch(()=>{});
+    satellites.high.el.play().catch(()=>{});
+
+    gate.style.display='none';
+    if (ctx.state==='suspended') await ctx.resume();
+  });
+
+  // ---------- Циклы ----------
+  setInterval(checkSatellites, 200);
+  requestAnimationFrame(rafLoop);
+
+  // ---------- Утилиты ----------
+  function log(s){ console.log(s); }
+  function shuffle(a){
+    for (let i=a.length-1; i>0; i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [a[i],a[j]]=[a[j],a[i]];
+    }
+  }
+})();
+</script>
 </body>
 </html>
