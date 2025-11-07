@@ -1,130 +1,3 @@
-<!doctype html>
-<html lang="ru">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Installation — web copy</title>
-  <style>
-    :root{
-      --bg:#000;        /* фон */
-      --fg:#fff;        /* текст */
-      --muted:#aaa;     /* подсказки */
-      --card:#000;      /* фон плиток (по умолчанию чёрный) */
-      --card-active:#444; /* активная плитка становится серой */
-      --ctrl:#111;      /* фон кнопок управления */
-      --ctrl-hover:#1a1a1a;
-      --gap:12px; --pad:16px; --radius:10px;
-    }
-    *{ box-sizing:border-box; }
-    html,body{ margin:0; padding:0; background:var(--bg); color:var(--fg);
-      font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-    }
-
-    header{
-      position:sticky; top:0; z-index:2;
-      background:rgba(0,0,0,.85); backdrop-filter:saturate(140%) blur(6px);
-      border-bottom:1px solid #111;
-      padding:10px var(--pad);
-    }
-    header .row{
-      display:flex; gap:12px; align-items:center; justify-content:space-between;
-      max-width:960px; margin:0 auto;
-    }
-    .hint{ color:var(--muted); font-size:14px; }
-
-    .wrap{ max-width:960px; margin:0 auto; padding:var(--pad); }
-
-    .grid{
-      display:grid; gap:var(--gap);
-      grid-template-columns:repeat(auto-fit,minmax(110px,1fr));
-    }
-
-    /* кнопки-плитки: без обводки, цифра по центру */
-    .pad, .ctrl{
-      background:var(--card); color:var(--fg);
-      cursor:pointer; user-select:none;
-      display:grid; place-items:center; text-align:center;
-      border:none; border-radius:var(--radius);
-      transition: transform .06s ease, opacity .2s ease, background-color .15s ease;
-    }
-    .pad{ aspect-ratio:1/1; font-weight:600; font-size:22px; }
-    .pad:active{ transform:scale(.98); }
-    .pad.active{ background:var(--card-active); }
-
-    .ctrl{
-      padding:12px 14px; background:var(--ctrl); font-weight:600;
-    }
-    .ctrl:hover{ background:var(--ctrl-hover); }
-    .ctrl:active{ transform:scale(.98); }
-
-    .row2{
-      display:grid; gap:var(--gap);
-      grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
-      margin-top:var(--gap);
-    }
-
-    .err{ color:#ff6b6b; font-size:14px; margin-top:8px; white-space:pre-wrap; }
-    .status{ font-size:13px; color:var(--muted); margin-top:6px; }
-
-    .overlay{
-      position:fixed; inset:0; z-index:10;
-      background:#000; color:var(--fg);
-      display:flex; align-items:center; justify-content:center;
-      padding:24px; text-align:center;
-      border:3px dashed #222;
-    }
-    .overlay button{
-      border:none; background:#fff; color:#000; padding:12px 18px;
-      font-weight:700; cursor:pointer; border-radius:12px;
-    }
-    .overlay .hint{ color:#bbb; }
-    /* фокус-обводка для доступности */
-    .pad:focus-visible, .ctrl:focus-visible, .overlay button:focus-visible{
-      outline:2px solid #888; outline-offset:2px;
-    }
-  </style>
-</head>
-<body>
-  <header>
-    <div class="row">
-      <div><strong>Веб-копия инсталляции</strong></div>
-      <div class="hint">сначала «Включить звук», затем кнопки</div>
-    </div>
-  </header>
-
-  <div class="wrap">
-    <div id="error" class="err" hidden></div>
-
-    <div class="grid" id="pads">
-      <!-- 9 основных -->
-      <button class="pad" data-idx="0">0</button>
-      <button class="pad" data-idx="1">1</button>
-      <button class="pad" data-idx="2">2</button>
-      <button class="pad" data-idx="3">3</button>
-      <button class="pad" data-idx="4">4</button>
-      <button class="pad" data-idx="5">5</button>
-      <button class="pad" data-idx="6">6</button>
-      <button class="pad" data-idx="7">7</button>
-      <button class="pad" data-idx="8">8</button>
-    </div>
-
-    <div class="row2" style="margin-top:16px">
-      <button id="btn-inhale" class="ctrl">Вдох (all)</button>
-      <button id="btn-random" class="ctrl">Случайные 3</button>
-      <button id="btn-reset" class="ctrl">Сброс</button>
-    </div>
-
-    <div class="status" id="status">Готово</div>
-  </div>
-
-  <div class="overlay" id="gate">
-    <div>
-      <p style="margin-top:0">Браузеры блокируют звук до жеста пользователя.</p>
-      <button id="unlock">Включить звук</button>
-      <div class="hint" style="margin-top:8px">на iPhone снимите беззвучный режим</div>
-    </div>
-  </div>
-
 <script>
 (() => {
   const E  = (sel, root=document) => root.querySelector(sel);
@@ -135,7 +8,6 @@
   const gate     = E('#gate');
   const btnUnlock= E('#unlock');
 
-  // файлы
   const files = [
     'sounds/00.mp3','sounds/01.mp3','sounds/02.mp3',
     'sounds/03.mp3','sounds/04.mp3','sounds/05.mp3',
@@ -145,24 +17,43 @@
   const groupOf = i => (i<=2?'low': i<=5?'mid':'high');
   const groups = ['low','mid','high'];
   const MAX_ACTIVE = 3;
+  const FADE_MS = 4000; // плавность 4 секунды
 
   let ctx, master, gains=[], buffers=[], preludeBuf=null;
   let active = new Set(), lru = [], groupQueues = {low:[],mid:[],high:[]};
-  let playingSources = {};
   let preludePlaying = false;
   let preludeSoftLockUntil = 0;
 
   function setStatus(t){ statusBox.textContent = t; }
   function showErr(msg){ errBox.hidden=false; errBox.textContent=msg; console.error(msg); }
 
+  // Инициализация аудио
   btnUnlock.addEventListener('click', async () => {
     try{
       if (!ctx){
         ctx = new (window.AudioContext || window.webkitAudioContext)({latencyHint:'interactive'});
         master = ctx.createGain(); master.gain.value = 0.95; master.connect(ctx.destination);
-        for (let i=0;i<files.length;i++){ const g=ctx.createGain(); g.gain.value=0.0; g.connect(master); gains[i]=g; }
+
+        // создаём отдельный Gain для каждого звука
+        for (let i=0;i<files.length;i++){
+          const g=ctx.createGain();
+          g.gain.value=0.0;
+          g.connect(master);
+          gains[i]=g;
+        }
+
         setStatus('Загружаю звуки…');
         await loadAllAudio();
+
+        // запускаем все лупы с нулевой громкостью — "фоновое дыхание"
+        for (let i=0;i<files.length;i++){
+          const src = ctx.createBufferSource();
+          src.buffer = buffers[i];
+          src.loop = true;
+          src.connect(gains[i]);
+          src.start(0);
+        }
+
         setStatus('Готово. Нажимайте кнопки.');
       }
       await ctx.resume();
@@ -170,28 +61,34 @@
     }catch(e){ showErr('Не удалось инициализировать звук: '+e.message); }
   });
 
-  async function fetchBuf(url){ const r=await fetch(url,{cache:'no-cache'}); if(!r.ok) throw new Error(url+' → '+r.status); return await r.arrayBuffer(); }
+  async function fetchBuf(url){
+    const r=await fetch(url,{cache:'no-cache'});
+    if(!r.ok) throw new Error(url+' → '+r.status);
+    return await r.arrayBuffer();
+  }
   async function decode(url){ return await ctx.decodeAudioData(await fetchBuf(url)); }
   async function loadAllAudio(){
     try{
       buffers = await Promise.all(files.map(decode));
       preludeBuf = await decode(prelude);
-    }catch(e){ showErr('Ошибка загрузки аудио. Проверьте пути и имена файлов.\n'+e.message); throw e; }
+    }catch(e){
+      showErr('Ошибка загрузки аудио. Проверьте пути и имена файлов.\n'+e.message);
+      throw e;
+    }
   }
 
-  function playLoop(idx){
-    stopIdx(idx);
-    const src=ctx.createBufferSource();
-    src.buffer=buffers[idx]; src.loop=true; src.connect(gains[idx]); src.start(0);
-    playingSources[idx]=src;
+  function fadeTo(param,to,ms=FADE_MS){
+    const now=ctx.currentTime;
+    param.cancelScheduledValues(now);
+    param.setValueAtTime(param.value,now);
+    param.linearRampToValueAtTime(to, now+ms/1000);
   }
-  function stopIdx(idx){ const s=playingSources[idx]; if(s){ try{s.stop()}catch{} delete playingSources[idx]; } }
-
-  function fadeTo(param,to,ms=600){ const now=ctx.currentTime; param.cancelScheduledValues(now); param.setValueAtTime(param.value,now); param.linearRampToValueAtTime(to, now+ms/1000); }
 
   function pushLRU(idx){
     lru = lru.filter(i=>i!==idx); lru.push(idx);
-    const g=groupOf(idx); groupQueues[g]=groupQueues[g].filter(i=>i!==idx); groupQueues[g].push(idx);
+    const g=groupOf(idx);
+    groupQueues[g]=groupQueues[g].filter(i=>i!==idx);
+    groupQueues[g].push(idx);
   }
   function popOldestGlobal(){ if(!lru.length) return; const v=lru.shift(); deactivate(v); }
   function popOldestFromGroup(g){ if(!groupQueues[g].length) return; const v=groupQueues[g].shift(); deactivate(v); }
@@ -201,7 +98,7 @@
     active.delete(idx);
     lru = lru.filter(i=>i!==idx);
     const g=groupOf(idx); groupQueues[g]=groupQueues[g].filter(i=>i!==idx);
-    fadeTo(gains[idx].gain, 0.0, 600);
+    fadeTo(gains[idx].gain, 0.0);
     E(`.pad[data-idx="${idx}"]`)?.classList.remove('active');
   }
   function activeInGroup(g){ return [...active].filter(i=>groupOf(i)===g); }
@@ -228,7 +125,9 @@
       deactivate(idx);
     }else{
       balanceBeforeOn(idx);
-      active.add(idx); pushLRU(idx); playLoop(idx); fadeTo(gains[idx].gain, 1.0, 600);
+      active.add(idx);
+      pushLRU(idx);
+      fadeTo(gains[idx].gain, 1.0);
       el.classList.add('active');
     }
   }
@@ -237,7 +136,10 @@
     const arr=[...Array(9).keys()].sort(()=>Math.random()-0.5).slice(0,3);
     arr.forEach(i=>{
       const el=E(`.pad[data-idx="${i}"]`);
-      balanceBeforeOn(i); active.add(i); pushLRU(i); playLoop(i); fadeTo(gains[i].gain,1.0,600);
+      balanceBeforeOn(i);
+      active.add(i);
+      pushLRU(i);
+      fadeTo(gains[i].gain,1.0);
       el?.classList.add('active');
     });
   }
@@ -246,13 +148,23 @@
 
   async function inhale(){
     if (preludePlaying) return;
-    preludePlaying=true; preludeSoftLockUntil=Date.now()+10000;
-    resetAll(); await new Promise(r=>setTimeout(r,300));
-    const src=ctx.createBufferSource(); src.buffer=preludeBuf;
-    const g=ctx.createGain(); g.gain.value=0.0; src.connect(g); g.connect(master); src.start(0);
-    g.gain.setValueAtTime(0,ctx.currentTime); g.gain.linearRampToValueAtTime(1.0,ctx.currentTime+0.08);
+    preludePlaying=true;
+    preludeSoftLockUntil=Date.now()+10000;
+    resetAll();
+    await new Promise(r=>setTimeout(r,300));
+
+    // проигрываем all.mp3 один раз, мягкий fade in/out
+    const src=ctx.createBufferSource();
+    src.buffer=preludeBuf;
+    const g=ctx.createGain();
+    g.gain.value=0.0;
+    src.connect(g); g.connect(master);
+    src.start(0);
+    g.gain.setValueAtTime(0,ctx.currentTime);
+    g.gain.linearRampToValueAtTime(1.0,ctx.currentTime+0.2);
     const tEnd=ctx.currentTime+preludeBuf.duration;
-    g.gain.setValueAtTime(1.0,tEnd-0.15); g.gain.linearRampToValueAtTime(0.0,tEnd);
+    g.gain.setValueAtTime(1.0,tEnd-0.2);
+    g.gain.linearRampToValueAtTime(0.0,tEnd);
     src.onended=()=>{ preludePlaying=false; setStatus('Готово'); };
     setStatus('Вдох…');
   }
@@ -263,5 +175,3 @@
   E('#btn-inhale').addEventListener('click',inhale);
 })();
 </script>
-</body>
-</html>
